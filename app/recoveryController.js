@@ -17,7 +17,8 @@ export const sendRecoveryEmail = async (req, res) => {
     const table = type === 'organizer' ? 'organizers' : 'users';
 
     try {
-        const [rows] = await pool.query(`SELECT id FROM ${table} WHERE email = ?`, [email]);
+        const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
+        const [rows] = await pool.query(`SELECT id FROM ${dbName}.${table} WHERE email = ?`, [email]);
 
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Email not found' });
@@ -27,9 +28,10 @@ export const sendRecoveryEmail = async (req, res) => {
         const expiration = new Date(Date.now() + 3600 * 1000); // 1 hora
 
         await pool.query(
-            `UPDATE ${table} SET recovery_token = ?, token_expires = ? WHERE email = ?`,
+            `UPDATE ${dbName}.${table} SET recovery_token = ?, token_expires = ? WHERE email = ?`,
             [token, expiration, email]
         );
+
 
         const transporter = nodemailer.createTransport({
             service: process.env.MAIL_SERVICE || 'gmail',
@@ -68,10 +70,13 @@ export const resetPassword = async (req, res) => {
     const table = type === 'organizer' ? 'organizers' : 'users';
 
     try {
+        const table = type === 'organizer' ? 'organizers' : 'users';
+        const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
         const [rows] = await pool.query(
-            `SELECT id, token_expires FROM ${table} WHERE recovery_token = ?`,
+            `SELECT id, token_expires FROM ${dbName}.${table} WHERE recovery_token = ?`,
             [token]
         );
+
 
         if (rows.length === 0) {
             return res.status(400).json({ error: 'Invalid token' });
@@ -87,9 +92,10 @@ export const resetPassword = async (req, res) => {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         await pool.query(
-            `UPDATE ${table} SET password = ?, recovery_token = NULL, token_expires = NULL WHERE id = ?`,
+            `UPDATE ${dbName}.${table} SET password = ?, recovery_token = NULL, token_expires = NULL WHERE id = ?`,
             [hashedPassword, user.id]
         );
+
 
         return res.json({ message: 'Password reset successful' });
 
