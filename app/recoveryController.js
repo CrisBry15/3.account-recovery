@@ -1,12 +1,12 @@
-import { pool } from '../config/db.js'
-import { v4 as uuidv4 } from 'uuid'
-import nodemailer from 'nodemailer'
-import dotenv from 'dotenv'
-import bcrypt from 'bcrypt'
+import { pool } from '../config/db.js';
+import { v4 as uuidv4 } from 'uuid';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
 
-dotenv.config()
+dotenv.config();
 
-// Function to send mail with recovery token
+// Enviar correo de recuperación
 export const sendRecoveryEmail = async (req, res) => {
     const { email, type } = req.body;
 
@@ -15,9 +15,9 @@ export const sendRecoveryEmail = async (req, res) => {
     }
 
     const table = type === 'organizer' ? 'organizers' : 'users';
+    const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
 
     try {
-        const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
         const [rows] = await pool.query(`SELECT id FROM ${dbName}.${table} WHERE email = ?`, [email]);
 
         if (rows.length === 0) {
@@ -31,7 +31,6 @@ export const sendRecoveryEmail = async (req, res) => {
             `UPDATE ${dbName}.${table} SET recovery_token = ?, token_expires = ? WHERE email = ?`,
             [token, expiration, email]
         );
-
 
         const transporter = nodemailer.createTransport({
             service: process.env.MAIL_SERVICE || 'gmail',
@@ -58,25 +57,22 @@ export const sendRecoveryEmail = async (req, res) => {
     }
 };
 
-
-// Function to reset the password
+// Restablecer la contraseña
 export const resetPassword = async (req, res) => {
     const { token, newPassword, type } = req.body;
 
     if (!token || !newPassword || !type) {
-        return res.status(400).json({ error: 'Token, new password, and type are required' });
+        return res.status(400).json({ error: 'Token, new password and type are required' });
     }
 
     const table = type === 'organizer' ? 'organizers' : 'users';
+    const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
 
     try {
-        const table = type === 'organizer' ? 'organizers' : 'users';
-        const dbName = type === 'organizer' ? 'organizer_auth_database' : process.env.MYSQL_DB;
         const [rows] = await pool.query(
             `SELECT id, token_expires FROM ${dbName}.${table} WHERE recovery_token = ?`,
             [token]
         );
-
 
         if (rows.length === 0) {
             return res.status(400).json({ error: 'Invalid token' });
@@ -96,9 +92,7 @@ export const resetPassword = async (req, res) => {
             [hashedPassword, user.id]
         );
 
-
         return res.json({ message: 'Password reset successful' });
-
     } catch (err) {
         console.error('Error resetting password:', err);
         return res.status(500).json({ error: 'Internal server error' });
